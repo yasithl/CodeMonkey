@@ -1,9 +1,0 @@
-﻿
-// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Welcome  to Code Monkey!");
-
-PlayGroundA.DoStuff();
-PlayGroundB.DoStuff();
-PlayGroundC.DoStuff();
-
-Console.WriteLine("********END*******");
