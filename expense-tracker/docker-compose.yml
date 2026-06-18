@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  tracker:
+    build: .
+    container_name: expense-gst-tracker
+    ports:
+      - "8000:8000"
+    volumes:
+      - tracker_data:/data
+    environment:
+      DATABASE_URL: sqlite:////data/db.sqlite3
+      UPLOAD_DIR: /data/uploads
+      GST_RATE: "0.20"
+      DEFAULT_CURRENCY: GBP
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  tracker_data:
+    driver: local
