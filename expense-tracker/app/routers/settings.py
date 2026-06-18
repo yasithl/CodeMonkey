@@ -11,7 +11,7 @@ DEFAULTS = {
     "gst_rate": str(app_config.GST_RATE),
     "default_currency": app_config.DEFAULT_CURRENCY,
     "company_name": "",
-    "tax_period_start": "04",  # April (UK tax year)
+    "tax_period_start": "04",  # April (NZ tax year: 1 Apr – 31 Mar)
 }
 
 

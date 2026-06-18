@@ -81,7 +81,10 @@ async function refreshMeta() {
   }
 }
 
-function currSym() { return state.settings.default_currency === "GBP" ? "£" : "$"; }
+function currSym() {
+  const map = { GBP: "£", EUR: "€", NZD: "NZ$", AUD: "A$", USD: "US$" };
+  return map[state.settings.default_currency] || "$";
+}
 
 // ---- Router -----------------------------------------------------
 const PAGES = {
@@ -135,7 +138,7 @@ async function renderDashboard() {
         <div class="value expense">${fmt.currency(summary.total_expenses, sym)}</div>
       </div>
       <div class="kpi-card">
-        <div class="label">GST / VAT Claimable (all time)</div>
+        <div class="label">GST Claimable (all time)</div>
         <div class="value gst">${fmt.currency(summary.total_gst_claimable, sym)}</div>
       </div>
       <div class="kpi-card">
@@ -214,7 +217,7 @@ function renderUpload() {
           <div id="drop-zone">
             <div class="upload-icon">&#x1F4C1;</div>
             <p><strong>Drop your CSV file here</strong> or click to browse</p>
-            <p class="hint">Supports Starling, Monzo, Barclays, Lloyds, HSBC, NatWest, Nationwide &amp; generic CSVs</p>
+            <p class="hint">Supports ANZ NZ, ASB, BNZ, Kiwibank, Westpac NZ &amp; generic CSV exports</p>
             <input type="file" id="file-input" accept=".csv" style="display:none">
           </div>
           <div id="upload-result" style="margin-top:16px"></div>
@@ -684,7 +687,7 @@ window.showCategoryModal = function(catId) {
     </div>
     <div class="form-group">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="m-gst" ${cat?.gst_claimable !== false ? "checked" : ""}> GST / VAT claimable on this category
+        <input type="checkbox" id="m-gst" ${cat?.gst_claimable !== false ? "checked" : ""}> GST claimable on this category
       </label>
     </div>
   `, async () => {
@@ -875,11 +878,11 @@ async function loadReport() {
         <div class="value income">${fmt.currency(data.total_income, sym)}</div>
       </div>
       <div class="kpi-card">
-        <div class="label">VAT Paid (on expenses)</div>
+        <div class="label">GST Paid (on expenses)</div>
         <div class="value">${fmt.currency(data.total_gst_paid, sym)}</div>
       </div>
       <div class="kpi-card">
-        <div class="label">VAT Reclaimable</div>
+        <div class="label">GST Claimable</div>
         <div class="value gst">${fmt.currency(data.total_gst_claimable, sym)}</div>
       </div>
       <div class="kpi-card">
@@ -900,13 +903,13 @@ async function loadReport() {
         </div>
       </div>
       <div class="card">
-        <div class="card-header">VAT Summary</div>
+        <div class="card-header">GST Summary</div>
         <div class="card-body">
           <table>
             <tbody>
-              <tr><td>Total VAT paid on purchases</td><td><strong>${fmt.currency(data.total_gst_paid, sym)}</strong></td></tr>
-              <tr><td>VAT reclaimable (business)</td><td><strong style="color:#2563eb">${fmt.currency(data.total_gst_claimable, sym)}</strong></td></tr>
-              <tr><td>Non-reclaimable VAT</td><td><strong>${fmt.currency(data.total_gst_paid - data.total_gst_claimable, sym)}</strong></td></tr>
+              <tr><td>Total GST paid on purchases</td><td><strong>${fmt.currency(data.total_gst_paid, sym)}</strong></td></tr>
+              <tr><td>GST claimable (business)</td><td><strong style="color:#2563eb">${fmt.currency(data.total_gst_claimable, sym)}</strong></td></tr>
+              <tr><td>Non-claimable GST</td><td><strong>${fmt.currency(data.total_gst_paid - data.total_gst_claimable, sym)}</strong></td></tr>
               <tr><td>Period</td><td>${data.from_date} → ${data.to_date}</td></tr>
             </tbody>
           </table>
@@ -919,7 +922,7 @@ async function loadReport() {
       <div class="card-body" style="padding:0">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Category</th><th>Transactions</th><th>Total</th><th>VAT Claimable</th><th>Type</th></tr></thead>
+            <thead><tr><th>Category</th><th>Transactions</th><th>Total</th><th>GST Claimable</th><th>Type</th></tr></thead>
             <tbody>
               ${data.by_category.map(c => `
                 <tr>
@@ -941,7 +944,7 @@ async function loadReport() {
       <div class="card-body" style="padding:0">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Month</th><th>Expenses</th><th>Income</th><th>VAT Claimable</th><th>Transactions</th></tr></thead>
+            <thead><tr><th>Month</th><th>Expenses</th><th>Income</th><th>GST Claimable</th><th>Transactions</th></tr></thead>
             <tbody>
               ${data.monthly_breakdown.map(m => `
                 <tr>
@@ -984,7 +987,7 @@ async function loadReport() {
             borderWidth: 2,
           },
           {
-            label: "VAT Claimable",
+            label: "GST Claimable",
             data: months.map(m => m.gst_claimable),
             backgroundColor: "#3b82f61a",
             borderColor: "#3b82f6",
@@ -1027,15 +1030,16 @@ async function renderSettings() {
             <div class="form-group">
               <label class="form-label">VAT / GST Rate (%)</label>
               <input type="number" class="form-control" id="s-gst" value="${((+map.gst_rate || 0.20) * 100).toFixed(0)}" min="0" max="100" step="1">
-              <small class="text-muted">UK standard VAT = 20%</small>
+              <small class="text-muted">NZ standard GST = 15%</small>
             </div>
             <div class="form-group">
               <label class="form-label">Default Currency</label>
               <select class="form-control" id="s-curr">
+                <option value="NZD" ${map.default_currency === "NZD" ? "selected" : ""}>NZD (NZ$)</option>
+                <option value="AUD" ${map.default_currency === "AUD" ? "selected" : ""}>AUD (A$)</option>
                 <option value="GBP" ${map.default_currency === "GBP" ? "selected" : ""}>GBP (£)</option>
                 <option value="EUR" ${map.default_currency === "EUR" ? "selected" : ""}>EUR (€)</option>
-                <option value="USD" ${map.default_currency === "USD" ? "selected" : ""}>USD ($)</option>
-                <option value="AUD" ${map.default_currency === "AUD" ? "selected" : ""}>AUD ($)</option>
+                <option value="USD" ${map.default_currency === "USD" ? "selected" : ""}>USD (US$)</option>
               </select>
             </div>
           </div>
