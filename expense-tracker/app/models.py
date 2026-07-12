@@ -87,6 +87,7 @@ class Transaction(Base):
     gst_amount: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=0)
     gst_claimable: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    receipt_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     tx_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

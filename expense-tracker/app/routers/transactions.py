@@ -28,6 +28,7 @@ def _to_out(tx: Transaction) -> dict:
         "gst_amount": tx.gst_amount,
         "gst_claimable": tx.gst_claimable,
         "notes": tx.notes,
+        "receipt_url": tx.receipt_url,
         "upload_id": tx.upload_id,
         "created_at": tx.created_at,
     }

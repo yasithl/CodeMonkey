@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
 from .models import AppSetting
 from .services.categorizer import seed_defaults
-from .routers import uploads, transactions, categories, reports, settings
+from .routers import uploads, transactions, categories, reports, settings, receipts
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(reports.router)
 app.include_router(settings.router)
+app.include_router(receipts.router)
 
 
 @app.get("/api/health")

@@ -59,6 +59,53 @@ function colorDot(color) {
   return `<span class="color-dot" style="background:${color || "#adb5bd"}"></span>`;
 }
 
+function receiptCell(tx) {
+  if (tx.receipt_url) {
+    return `<div style="display:flex;align-items:center;gap:4px">
+      <a href="${tx.receipt_url}" target="_blank" class="btn btn-sm btn-secondary" title="View receipt">&#x1F517;</a>
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeReceipt(${tx.id},this)" title="Remove">&#x2715;</button>
+    </div>`;
+  }
+  return `<label class="btn btn-sm btn-secondary" style="cursor:pointer;margin:0" title="Upload receipt">
+    &#x1F4CE;<input type="file" accept="image/*,.pdf" style="display:none" onchange="uploadReceipt(${tx.id},this)">
+  </label>`;
+}
+
+window.uploadReceipt = async function(txId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const label = input.closest("label");
+  const origHtml = label.innerHTML;
+  label.style.pointerEvents = "none";
+  label.textContent = "↑…";
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const data = await api.post(`/api/transactions/${txId}/receipt`, fd);
+    toast("Receipt uploaded to Google Drive", "success");
+    const cell = label.closest("td");
+    if (cell) cell.innerHTML = `<div style="display:flex;align-items:center;gap:4px">
+      <a href="${data.receipt_url}" target="_blank" class="btn btn-sm btn-secondary" title="View receipt">&#x1F517;</a>
+      <button class="btn btn-sm btn-danger btn-icon" onclick="removeReceipt(${txId},this)" title="Remove">&#x2715;</button>
+    </div>`;
+  } catch (e) {
+    toast(e.message, "error");
+    label.innerHTML = origHtml;
+    label.style.pointerEvents = "";
+  }
+};
+
+window.removeReceipt = async function(txId, btn) {
+  try {
+    await api.delete(`/api/transactions/${txId}/receipt`);
+    toast("Receipt link removed", "info");
+    const cell = btn.closest("td");
+    if (cell) cell.innerHTML = `<label class="btn btn-sm btn-secondary" style="cursor:pointer;margin:0" title="Upload receipt">
+      &#x1F4CE;<input type="file" accept="image/*,.pdf" style="display:none" onchange="uploadReceipt(${txId},this)">
+    </label>`;
+  } catch (e) { toast(e.message, "error"); }
+};
+
 // ---- State ------------------------------------------------------
 let state = { categories: [], settings: {}, pendingCount: 0, chart: null };
 
@@ -332,7 +379,7 @@ async function renderReconcile() {
             <thead>
               <tr>
                 <th>Date</th><th>Description</th><th>Amount</th>
-                <th>Category</th><th>GST?</th><th>Notes</th><th></th>
+                <th>Category</th><th>GST?</th><th>Notes</th><th>Receipt</th><th></th>
               </tr>
             </thead>
             <tbody id="recon-tbody"></tbody>
@@ -417,6 +464,7 @@ async function loadReconcileData() {
       <td>
         <input type="text" class="form-control" id="notes-${tx.id}" placeholder="Notes…" value="${tx.notes || ""}" style="min-width:120px">
       </td>
+      <td>${receiptCell(tx)}</td>
       <td>
         <div class="flex gap-2">
           <button class="btn btn-sm btn-success" onclick="saveRecon(${tx.id})">Save</button>
@@ -517,7 +565,7 @@ async function renderTransactions() {
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th></tr>
+              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th><th>Receipt</th></tr>
             </thead>
             <tbody id="tx-tbody"></tbody>
           </table>
@@ -604,6 +652,7 @@ async function loadTxData() {
       <td class="text-sm">${tx.gst_claimable ? fmt.currency(tx.gst_amount, sym) : "—"}</td>
       <td>${statusBadge(tx.reconciliation_status)}</td>
       <td class="text-muted text-sm">${tx.notes || ""}</td>
+      <td>${receiptCell(tx)}</td>
     </tr>
   `).join("");
 }
@@ -759,7 +808,7 @@ window.showRulesModal = async function(catId, catName) {
         <option value="startswith">starts with</option>
         <option value="regex">regex</option>
       </select>
-      <button class="btn btn-primary" onclick="addRule(${catId}, '${catName.replace(/'/g,"\\'")}')">Add</button>
+      <button class="btn btn-primary" onclick="addRule(${catId}, '${catName.replace(/'/g,"\\'")}')">àd</button>
     </div>
   `, null, "Close");
 };
@@ -1056,6 +1105,27 @@ async function renderSettings() {
       </div>
 
       <div class="card">
+        <div class="card-header">&#x2601;&#xFE0F; Google Drive (Receipt Storage)</div>
+        <div class="card-body">
+          <div id="gdrive-status" class="text-muted text-sm" style="margin-bottom:12px">Checking…</div>
+          <a href="/api/gdrive/auth" class="btn btn-primary btn-sm" id="btn-gdrive-connect">Connect / Re-authorise Google Drive</a>
+          <hr>
+          <details style="font-size:.82rem;color:#6b7280">
+            <summary style="cursor:pointer;font-weight:600;margin-bottom:6px">Setup instructions</summary>
+            <ol style="margin:0;padding-left:20px;line-height:1.9">
+              <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> and create (or select) a project.</li>
+              <li>Enable the <strong>Google Drive API</strong> for the project.</li>
+              <li>Go to <em>APIs &amp; Services → Credentials</em> → <strong>Create OAuth 2.0 Client ID</strong> (type: Web Application).</li>
+              <li>Under <em>Authorised redirect URIs</em> add: <code>http://localhost:8000/api/gdrive/callback</code></li>
+              <li>Download the JSON file, rename it to <code>google_credentials.json</code>, and place it in the <code>data/</code> directory (next to the database).</li>
+              <li>Click <strong>Connect / Re-authorise</strong> above to complete the OAuth flow.</li>
+            </ol>
+            <p style="margin-top:8px">Receipts are uploaded to <strong>Google Drive → Expense Receipts → &lt;Category&gt;/</strong> and shared as view-only links.</p>
+          </details>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header">&#x1F4DA; API Documentation</div>
         <div class="card-body">
           <p class="text-muted" style="font-size:.875rem;margin-top:0">Interactive API docs are available at:</p>
@@ -1085,6 +1155,19 @@ async function renderSettings() {
       refreshMeta();
     } catch (e) { toast(e.message, "error"); }
   });
+
+  // Show Google Drive connection status
+  api.get("/api/gdrive/status").then(s => {
+    const el = document.getElementById("gdrive-status");
+    if (!el) return;
+    if (s.connected) {
+      el.innerHTML = '<span style="color:#16a34a;font-weight:600">&#x2705; Connected</span> — receipts upload to <strong>Google Drive → Expense Receipts → &lt;Category&gt;/</strong>';
+    } else if (s.credentials_file_found) {
+      el.innerHTML = '<span style="color:#d97706;font-weight:600">&#x26A0;&#xFE0F; Credentials found but not authorised</span> — click Connect below to complete the OAuth flow.';
+    } else {
+      el.innerHTML = '<span style="color:#dc2626;font-weight:600">&#x274C; Not connected</span> — <code>google_credentials.json</code> not found in the <code>data/</code> directory. Follow the setup instructions below.';
+    }
+  }).catch(() => {});
 }
 
 // ---- Modal helpers ----------------------------------------------
@@ -1123,6 +1206,11 @@ async function init() {
     await refreshMeta();
   } catch (e) {
     console.warn("Meta refresh failed:", e);
+  }
+  const params = new URLSearchParams(location.search);
+  if (params.get("gdrive") === "connected") {
+    toast("Google Drive connected successfully!", "success");
+    history.replaceState(null, "", location.pathname + location.hash);
   }
   const page = (location.hash || "#/dashboard").replace(/^#\//, "") || "dashboard";
   navigate(page);

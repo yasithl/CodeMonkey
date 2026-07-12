@@ -59,6 +59,7 @@ class TransactionOut(BaseModel):
     gst_amount: Decimal
     gst_claimable: bool
     notes: Optional[str]
+    receipt_url: Optional[str]
     upload_id: Optional[int]
     created_at: datetime
 
@@ -68,6 +69,7 @@ class TransactionUpdate(BaseModel):
     reconciliation_status: Optional[str] = None
     gst_claimable: Optional[bool] = None
     notes: Optional[str] = None
+    receipt_url: Optional[str] = None
 
 
 class UploadOut(BaseModel):
