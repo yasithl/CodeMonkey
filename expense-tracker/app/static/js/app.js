@@ -524,7 +524,7 @@ async function renderTransactions() {
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th><th>Receipt</th></tr>
+              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th><th>Receipt</th><th></th></tr>
             </thead>
             <tbody id="tx-tbody"></tbody>
           </table>
@@ -590,7 +590,7 @@ async function loadTxData() {
   if (!tbody) return;
 
   if (data.items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No transactions found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No transactions found</td></tr>';
     return;
   }
 
@@ -614,9 +614,68 @@ async function loadTxData() {
       <td>
         <button class="btn btn-sm btn-secondary" data-receipt-btn="${tx.id}" onclick="openReceipts(${tx.id})">${receiptLabel(tx.receipt_count)}</button>
       </td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="editTransaction(${tx.id})">Edit</button>
+      </td>
     </tr>
   `).join("");
 }
+
+window.editTransaction = async function(id) {
+  const tx = await api.get(`/api/transactions/${id}`);
+  const catOptions = state.categories
+    .map(c => `<option value="${c.id}" ${c.id === tx.category_id ? "selected" : ""}>${c.name}</option>`)
+    .join("");
+
+  createModal("Edit Transaction", `
+    <div class="text-sm text-muted" style="margin-bottom:12px">
+      ${fmt.date(tx.date)} &middot; ${tx.description}${tx.merchant ? " &middot; " + tx.merchant : ""} &middot; ${amountCell(tx.amount)}
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-control" id="e-cat">
+        <option value="">— None —</option>
+        ${catOptions}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reconciliation status</label>
+      <select class="form-control" id="e-status">
+        <option value="pending" ${tx.reconciliation_status === "pending" ? "selected" : ""}>Pending (send back to Reconcile)</option>
+        <option value="manual" ${tx.reconciliation_status === "manual" ? "selected" : ""}>Manual</option>
+        <option value="auto" ${tx.reconciliation_status === "auto" ? "selected" : ""}>Auto</option>
+        <option value="ignored" ${tx.reconciliation_status === "ignored" ? "selected" : ""}>Ignored</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="e-gst" ${tx.gst_claimable ? "checked" : ""}> GST claimable
+      </label>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <input class="form-control" id="e-notes" value="${(tx.notes || "").replace(/"/g, "&quot;")}">
+    </div>
+  `, async () => {
+    const catVal = document.getElementById("e-cat").value;
+    const newCatId = catVal ? parseInt(catVal) : null;
+    const body = {
+      gst_claimable: document.getElementById("e-gst").checked,
+      reconciliation_status: document.getElementById("e-status").value,
+      notes: document.getElementById("e-notes").value || null,
+    };
+    if (newCatId !== null && newCatId !== tx.category_id) {
+      body.category_id = newCatId;
+    }
+    try {
+      await api.patch(`/api/transactions/${id}`, body);
+      toast("Transaction updated", "success");
+      closeModal();
+      loadTxData();
+      refreshMeta();
+    } catch (e) { toast(e.message, "error"); }
+  });
+};
 
 // ---- Categories -------------------------------------------------
 async function renderCategories() {
