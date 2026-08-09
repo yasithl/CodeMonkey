@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 from ..database import get_db
 from ..models import Transaction, Category
@@ -30,6 +30,7 @@ def _to_out(tx: Transaction) -> dict:
         "notes": tx.notes,
         "upload_id": tx.upload_id,
         "created_at": tx.created_at,
+        "receipt_count": len(tx.receipts),
     }
 
 
@@ -44,7 +45,7 @@ def list_transactions(
     page_size: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Transaction)
+    q = db.query(Transaction).options(selectinload(Transaction.receipts))
     if from_date:
         q = q.filter(Transaction.date >= from_date)
     if to_date:
@@ -85,7 +86,11 @@ def list_pending(
     page_size: int = Query(25, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Transaction).filter(Transaction.reconciliation_status == "pending")
+    q = (
+        db.query(Transaction)
+        .options(selectinload(Transaction.receipts))
+        .filter(Transaction.reconciliation_status == "pending")
+    )
     total = q.count()
     txns = (
         q.order_by(Transaction.date.desc())

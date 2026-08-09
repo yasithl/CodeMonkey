@@ -11,6 +11,7 @@ services:
     environment:
       DATABASE_URL: sqlite:////data/db.sqlite3
       UPLOAD_DIR: /data/uploads
+      RECEIPTS_DIR: /data/receipts
       GST_RATE: "0.15"
       DEFAULT_CURRENCY: NZD
     restart: unless-stopped

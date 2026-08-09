@@ -47,12 +47,16 @@ const fmt = {
 function amountCell(v) {
   const n = +v;
   const cls = n < 0 ? "amount-neg" : "amount-pos";
-  return `<span class="${cls}">${fmt.currency(n)}</span>`;
+  return `<span class="${cls}">${fmt.currency(n, currSym())}</span>`;
 }
 
 function statusBadge(s) {
   const map = { auto: "badge-auto", manual: "badge-manual", pending: "badge-pending", ignored: "badge-ignored" };
   return `<span class="badge ${map[s] || ""}">${s}</span>`;
+}
+
+function receiptLabel(count) {
+  return count > 0 ? `📎 ${count}` : "📎 Attach";
 }
 
 function colorDot(color) {
@@ -332,7 +336,7 @@ async function renderReconcile() {
             <thead>
               <tr>
                 <th>Date</th><th>Description</th><th>Amount</th>
-                <th>Category</th><th>GST?</th><th>Notes</th><th></th>
+                <th>Category</th><th>GST?</th><th>Notes</th><th>Receipt</th><th></th>
               </tr>
             </thead>
             <tbody id="recon-tbody"></tbody>
@@ -385,7 +389,7 @@ async function loadReconcileData() {
   if (!tbody) return;
 
   if (data.items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">🎉</div>All transactions reconciled!</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="icon">🎉</div>All transactions reconciled!</td></tr>';
     return;
   }
 
@@ -416,6 +420,9 @@ async function loadReconcileData() {
       </td>
       <td>
         <input type="text" class="form-control" id="notes-${tx.id}" placeholder="Notes…" value="${tx.notes || ""}" style="min-width:120px">
+      </td>
+      <td>
+        <button class="btn btn-sm btn-secondary" data-receipt-btn="${tx.id}" onclick="openReceipts(${tx.id})">${receiptLabel(tx.receipt_count)}</button>
       </td>
       <td>
         <div class="flex gap-2">
@@ -517,7 +524,7 @@ async function renderTransactions() {
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th></tr>
+              <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>GST</th><th>Status</th><th>Notes</th><th>Receipt</th></tr>
             </thead>
             <tbody id="tx-tbody"></tbody>
           </table>
@@ -583,7 +590,7 @@ async function loadTxData() {
   if (!tbody) return;
 
   if (data.items.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transactions found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No transactions found</td></tr>';
     return;
   }
 
@@ -604,6 +611,9 @@ async function loadTxData() {
       <td class="text-sm">${tx.gst_claimable ? fmt.currency(tx.gst_amount, sym) : "—"}</td>
       <td>${statusBadge(tx.reconciliation_status)}</td>
       <td class="text-muted text-sm">${tx.notes || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-secondary" data-receipt-btn="${tx.id}" onclick="openReceipts(${tx.id})">${receiptLabel(tx.receipt_count)}</button>
+      </td>
     </tr>
   `).join("");
 }
@@ -1085,6 +1095,62 @@ async function renderSettings() {
       refreshMeta();
     } catch (e) { toast(e.message, "error"); }
   });
+}
+
+// ---- Receipts -----------------------------------------------------
+window.openReceipts = async function(txId) {
+  const body = `
+    <div id="receipt-list" class="text-sm" style="margin-bottom:14px">Loading…</div>
+    <div class="flex gap-2" style="align-items:center">
+      <input type="file" id="receipt-file-input" accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.pdf" style="flex:1">
+      <button class="btn btn-sm btn-primary" id="receipt-upload-btn">Upload</button>
+    </div>
+  `;
+  createModal("📎 Receipts", body, null, "Close");
+  document.getElementById("receipt-upload-btn").addEventListener("click", () => uploadReceipt(txId));
+  await loadReceiptList(txId);
+};
+
+async function loadReceiptList(txId) {
+  const listEl = document.getElementById("receipt-list");
+  if (!listEl) return;
+  try {
+    const receipts = await api.get(`/api/transactions/${txId}/receipts`);
+    listEl.innerHTML = receipts.length === 0
+      ? '<span class="text-muted">No receipts attached yet.</span>'
+      : receipts.map(r => `
+          <div class="flex gap-2" style="align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+            <a href="/api/receipts/${r.id}/file" target="_blank">${r.original_filename}</a>
+            <button class="btn btn-sm btn-secondary" onclick="deleteReceipt(${txId}, ${r.id})">✕</button>
+          </div>
+        `).join("");
+    updateReceiptBadge(txId, receipts.length);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function uploadReceipt(txId) {
+  const input = document.getElementById("receipt-file-input");
+  if (!input.files[0]) { toast("Choose a file first", "error"); return; }
+  const fd = new FormData();
+  fd.append("file", input.files[0]);
+  try {
+    await api.post(`/api/transactions/${txId}/receipts`, fd);
+    input.value = "";
+    toast("Receipt uploaded", "success");
+    await loadReceiptList(txId);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+window.deleteReceipt = async function(txId, receiptId) {
+  try {
+    await api.delete(`/api/receipts/${receiptId}`);
+    await loadReceiptList(txId);
+  } catch (e) { toast(e.message, "error"); }
+};
+
+function updateReceiptBadge(txId, count) {
+  const btn = document.querySelector(`[data-receipt-btn="${txId}"]`);
+  if (btn) btn.textContent = receiptLabel(count);
 }
 
 // ---- Modal helpers ----------------------------------------------

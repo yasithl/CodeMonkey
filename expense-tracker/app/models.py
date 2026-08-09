@@ -96,11 +96,32 @@ class Transaction(Base):
     category: Mapped[Optional["Category"]] = relationship(
         "Category", back_populates="transactions"
     )
+    receipts: Mapped[List["Receipt"]] = relationship(
+        "Receipt", back_populates="transaction", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_transactions_date", "date"),
         Index("ix_transactions_status", "reconciliation_status"),
         Index("ix_transactions_category", "category_id"),
+    )
+
+
+class Receipt(Base):
+    __tablename__ = "receipts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(
+        ForeignKey("transactions.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    original_filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(100))
+    size: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    transaction: Mapped["Transaction"] = relationship(
+        "Transaction", back_populates="receipts"
     )
 
 

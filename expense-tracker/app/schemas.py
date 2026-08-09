@@ -61,6 +61,7 @@ class TransactionOut(BaseModel):
     notes: Optional[str]
     upload_id: Optional[int]
     created_at: datetime
+    receipt_count: int = 0
 
 
 class TransactionUpdate(BaseModel):
@@ -68,6 +69,16 @@ class TransactionUpdate(BaseModel):
     reconciliation_status: Optional[str] = None
     gst_claimable: Optional[bool] = None
     notes: Optional[str] = None
+
+
+class ReceiptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    transaction_id: int
+    original_filename: str
+    content_type: str
+    size: int
+    created_at: datetime
 
 
 class UploadOut(BaseModel):

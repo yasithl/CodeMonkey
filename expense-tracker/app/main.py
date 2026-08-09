@@ -6,12 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base, SessionLocal
 from .models import AppSetting
 from .services.categorizer import seed_defaults
-from .routers import uploads, transactions, categories, reports, settings
+from .routers import uploads, transactions, categories, reports, settings, receipts
+from .config import settings as app_config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs("./data/uploads", exist_ok=True)
+    os.makedirs(app_config.RECEIPTS_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -41,6 +43,7 @@ app.include_router(transactions.router)
 app.include_router(categories.router)
 app.include_router(reports.router)
 app.include_router(settings.router)
+app.include_router(receipts.router)
 
 
 @app.get("/api/health")
